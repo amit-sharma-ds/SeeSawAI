@@ -1,0 +1,5 @@
+train: ./datasets/cctv_train/images/train
+val: ./datasets/cctv_train/images/val
+
+nc: 1
+names: ['person']

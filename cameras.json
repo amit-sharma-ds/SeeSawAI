@@ -1,0 +1,54 @@
+{
+  "cameras": [
+    {
+      "camera_id": "vtest_demo",
+      "source": "samples/videos/vtest_pedestrians.avi",
+      "every_n": 10,
+      "width": 640,
+      "detector": "yolo",
+      "features": ["person", "restricted_area", "crowd", "loitering"],
+      "rules": {
+        "loiter_seconds": 20,
+        "loiter_radius": 0.08,
+        "crowd_limit": 4,
+        "crowd_min_hits": 2,
+        "cooldown_seconds": 20,
+        "direction": null,
+        "zones": [
+          {
+            "name": "taped_off_area",
+            "kind": "restricted",
+            "polygon": [[0.28, 0.2], [0.7, 0.2], [0.7, 0.47], [0.28, 0.47]]
+          }
+        ]
+      }
+    },
+    {
+      "camera_id": "cam1",
+      "source": "http://192.168.1.5:4747/video",
+      "every_n": 2,
+      "width": 640,
+      "features": ["person", "restricted_area", "industrial_safety", "loitering", "crowd"],
+      "rules": {
+        "loiter_seconds": 30,
+        "loiter_radius": 0.15,
+        "crowd_limit": 5,
+        "crowd_min_hits": 3,
+        "cooldown_seconds": 30,
+        "direction": null,
+        "zones": [
+          {
+            "name": "gate",
+            "kind": "restricted",
+            "polygon": [[0.65, 0.15], [0.98, 0.15], [0.98, 0.95], [0.65, 0.95]]
+          },
+          {
+            "name": "machine",
+            "kind": "danger",
+            "polygon": [[0.02, 0.55], [0.3, 0.55], [0.3, 0.98], [0.02, 0.98]]
+          }
+        ]
+      }
+    }
+  ]
+}

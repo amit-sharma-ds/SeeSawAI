@@ -1,0 +1,37 @@
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+*.pt
+*.weights
+*.onnx
+.idea/
+.vscode/
+*.log
+.ipynb_checkpoints/
+
+# downloaded model weights (code re-downloads them)
+models/
+*.caffemodel
+
+# datasets and archives stay local; only data.yaml is versioned
+datasets/coco/
+datasets/coco8/
+datasets/coco128/
+datasets/cctv_train/images/
+datasets/cctv_train/labels/
+*.zip
+
+# ultralytics training output
+runs/
+
+# live run output and local test clips
+alerts.jsonl
+*.avi
+clips/
+
+# API keys issued to developers, never commit
+api_keys.txt
+
+# uploaded videos and their annotated copies
+uploads/

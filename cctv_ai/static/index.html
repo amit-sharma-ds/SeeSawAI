@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SeeSaw AI</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg:#0f1115; --panel:#181b22; --line:#2a2f3a; --text:#e6e8ee; --muted:#8b93a7; --accent:#4f8cff; --ok:#3ecf8e; --warn:#f5a623; --danger:#ff4d4f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui, "Segoe UI", Roboto, sans-serif; }
+  header { display:flex; gap:12px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header .sub { color:var(--muted); font-size:12px; }
+  .tabs { display:flex; gap:6px; margin-left:8px; }
+  .tabs button { background:none; border:1px solid var(--line); color:var(--text); padding:7px 14px; border-radius:8px; cursor:pointer; font-size:14px; }
+  .tabs button.active { background:var(--accent); border-color:var(--accent); }
+  main { padding:16px; max-width:1200px; margin:0 auto; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .grid { display:grid; grid-template-columns:minmax(0, 2fr) minmax(280px, 1fr); gap:16px; }
+  .grid > * { min-width:0; }
+  @media (max-width: 820px) { .grid { grid-template-columns:1fr; } }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .between { justify-content:space-between; }
+  .muted { color:var(--muted); }
+  .small { font-size:12px; }
+  .hidden { display:none !important; }
+  .drop { border:2px dashed #3a4150; border-radius:10px; padding:26px 16px; text-align:center; cursor:pointer; background:#141720; }
+  .drop.over { border-color:var(--accent); background:#161c2b; }
+  .drop .big { font-size:16px; font-weight:600; }
+  .drop .hint { color:var(--muted); margin-top:4px; }
+  .samples { display:flex; gap:8px; overflow-x:auto; padding:10px 0 4px; max-width:100%; }
+  .samples img { height:64px; border-radius:6px; cursor:pointer; border:2px solid transparent; }
+  .samples img:hover { border-color:var(--accent); }
+  .stage { position:relative; margin-top:10px; }
+  canvas { max-width:100%; display:block; border-radius:8px; background:#000; }
+  .tip { position:absolute; pointer-events:none; background:rgba(0,0,0,.85); color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; display:none; white-space:nowrap; }
+  ul.list { list-style:none; margin:8px 0 0; padding:0; max-height:380px; overflow:auto; }
+  ul.list li { padding:6px 8px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; cursor:pointer; }
+  ul.list li.hot { background:#222a3a; }
+  .swatch { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:8px; }
+  input, select { background:#0f1115; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:13px; }
+  button.primary { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:14px; }
+  button.primary:disabled { opacity:.5; cursor:not-allowed; }
+  button.plain { background:none; border:1px solid var(--line); color:var(--text); border-radius:8px; padding:7px 12px; cursor:pointer; }
+  button.danger { border-color:#5a2a2a; color:#ff8a8a; }
+  .alert { padding:6px 8px; border-left:3px solid var(--danger); margin-bottom:6px; background:#1d1a20; border-radius:0 6px 6px 0; }
+  .alert.medium { border-color:var(--warn); }
+  .alert.critical { border-color:#ff2d55; }
+  img.stream { max-width:100%; border-radius:8px; background:#000; margin-top:10px; min-height:100px; display:block; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chip { border:1px solid var(--line); border-radius:16px; padding:4px 11px; cursor:pointer; user-select:none; font-size:13px; display:inline-flex; gap:6px; align-items:center; background:#141720; }
+  .chip .n { color:var(--muted); font-size:11px; }
+  .chip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .chip.on .n { color:#dce7ff; }
+  .chip.model { border-style:dashed; }
+  .chip.planned { opacity:.4; cursor:not-allowed; }
+  .legend { color:var(--muted); font-size:12px; margin-top:6px; }
+  .legend .l { display:inline-block; border:1px dashed var(--muted); border-radius:10px; padding:0 6px; margin:0 4px; }
+  .bar { height:8px; background:#2a2f3a; border-radius:4px; overflow:hidden; margin-top:8px; }
+  .bar > div { height:100%; background:var(--accent); width:0; transition:width .4s; }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin-top:8px; }
+  .kv b { color:var(--muted); font-weight:500; }
+  .notice { background:#1c2030; border:1px solid #2f3a55; border-radius:8px; padding:8px 10px; margin-top:10px; font-size:13px; }
+  .stat { font-size:22px; font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>SeeSaw AI</h1><div class="sub" id="status">checking server...</div></div>
+  <div class="tabs">
+    <button id="tab-image" class="active">Image</button>
+    <button id="tab-video">Video</button>
+    <button id="tab-live">Live cameras</button>
+  </div>
+  <span style="flex:1"></span>
+  <label class="muted small">detector <select id="detector"><option value="auto">auto</option><option value="hog">fast, people only</option><option value="yolo">accurate, all objects</option></select></label>
+  <label class="muted small">API key <input id="apikey" type="password" placeholder="empty if open" size="16"></label>
+</header>
+
+<main>
+  <section class="panel" style="margin-bottom:16px">
+    <div class="row between">
+      <div><strong>What to detect</strong> <span class="muted small" id="feat-meta"></span></div>
+      <div class="row small"><a href="#" id="feat-all">all</a><a href="#" id="feat-none">none</a></div>
+    </div>
+    <div id="features" class="chips"></div>
+    <div class="legend">click to switch on or off · <span class="l">dashed</span> needs a model file (hover to see which) · faded = coming soon · timing rules apply to video and live only</div>
+  </section>
+
+  <section id="page-image" class="grid">
+    <div class="panel">
+      <div id="drop" class="drop">
+        <div class="big">Drop an image here, or click to choose</div>
+        <div class="hint" id="det-hint"></div>
+        <input id="file" type="file" accept="image/*" class="hidden">
+      </div>
+      <div class="row" style="margin-top:10px"><span class="muted small">Or click a sample:</span><span id="sample-cats" class="row small"></span></div>
+      <div id="samples" class="samples"></div>
+      <div class="stage"><canvas id="canvas" width="16" height="9"></canvas><div id="tip" class="tip"></div></div>
+    </div>
+    <div class="panel">
+      <div class="row between"><strong>Result</strong><button id="img-clear" class="plain small">clear</button></div>
+      <div id="det-meta" class="muted" style="margin-top:6px">no image yet</div>
+      <label class="muted small">min confidence <input id="conf" type="range" min="0" max="1" step="0.05" value="0.3"> <span id="conf-val">0.30</span></label>
+      <div id="classes-box" class="hidden" style="margin-top:10px">
+        <div class="row between"><strong>Classes</strong><span id="classes-total" class="muted small"></span></div>
+        <ul id="class-list" class="list" style="max-height:200px"></ul>
+      </div>
+      <div id="expected-box" class="hidden" style="margin-top:10px">
+        <div class="row between"><strong>Actually in this photo</strong><span class="muted small">from the dataset labels</span></div>
+        <ul id="expected-list" class="list" style="max-height:160px"></ul>
+      </div>
+      <details style="margin-top:10px"><summary class="muted small">every detection</summary><ul id="det-list" class="list"></ul></details>
+      <div id="img-notice" class="notice hidden"></div>
+    </div>
+  </section>
+
+  <section id="page-video" class="grid hidden">
+    <div class="panel">
+      <div id="vdrop" class="drop">
+        <div class="big">Drop a video here, or click to choose</div>
+        <div class="hint">mp4, avi, mov, mkv. It is analysed like a camera: boxes, ids and alerts.</div>
+        <input id="vfile" type="file" accept="video/*" class="hidden">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="muted small">detect every <select id="v-every"><option>1</option><option selected>2</option><option>3</option><option>5</option><option>10</option><option>15</option></select> frame</label>
+        <label class="muted small">speed <select id="v-pace"><option value="true" selected>natural</option><option value="false">as fast as possible</option></select></label>
+        <label class="muted small">zones from <select id="v-rules"><option value="">none</option></select></label>
+        <label class="muted small"><input id="v-record" type="checkbox" checked> save annotated copy</label>
+      </div>
+      <div class="row" style="margin-top:10px"><span class="muted small">Or click a sample video:</span><span id="vsample-cats" class="row small"></span></div>
+      <div id="vsamples" class="samples"></div>
+      <div id="v-name" class="muted small" style="margin-top:8px"></div>
+      <div class="bar"><div id="v-bar"></div></div>
+      <img id="vstream" class="stream hidden" alt="annotated video">
+      <div id="v-status" class="muted small" style="margin-top:6px"></div>
+    </div>
+    <div class="panel">
+      <div class="row between"><strong>Summary</strong>
+        <div class="row"><button id="v-stop" class="plain small hidden">stop</button><a id="v-download" class="plain small hidden" style="text-decoration:none;padding:7px 12px;border:1px solid var(--line);border-radius:8px" download>download annotated .avi</a><button id="v-remove" class="plain small danger hidden">remove</button></div>
+      </div>
+      <div id="v-summary" class="kv"><span class="muted">upload a video to see people seen, alerts by type and duration.</span></div>
+      <strong style="display:block;margin-top:12px">Alerts</strong>
+      <div id="v-alerts" style="margin-top:8px"><span class="muted">none yet</span></div>
+    </div>
+  </section>
+
+  <section id="page-live" class="grid hidden">
+    <div class="panel">
+      <div class="row">
+        <select id="cam-select"></select>
+        <button id="cam-refresh" class="plain">refresh</button>
+        <span style="flex:1"></span>
+        <input id="new-id" placeholder="camera id" size="9">
+        <input id="new-src" placeholder="camera index, http://phone-ip:8080/video or rtsp://..." size="34">
+        <button id="cam-start" class="primary">start</button>
+      </div>
+      <img id="stream" class="stream" alt="live stream appears here">
+      <div id="cam-status" class="muted small" style="margin-top:6px"></div>
+      <div class="notice">DroidCam: connect with the Windows client, then enter its webcam index (often <code>0</code> or <code>1</code>). IP Webcam: enter <code>http://&lt;phone-ip&gt;:8080/video</code>. CCTV: paste the camera's <code>rtsp://</code> address. Don't use the DroidCam Remote webpage URL as a video source.</div>
+    </div>
+    <div class="panel">
+      <strong>Alerts</strong> <span class="muted small">(refreshes every 2 s)</span>
+      <div id="alerts" style="margin-top:8px"><span class="muted">no alerts yet</span></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const pct = (v) => (v * 100).toFixed(0) + '%';
+
+  // ---- API key (kept in this browser only) ----
+  const keyInput = $('apikey');
+  try { keyInput.value = localStorage.getItem('seesaw_api_key') || ''; } catch (e) {}
+  keyInput.addEventListener('change', () => {
+    try { localStorage.setItem('seesaw_api_key', keyInput.value.trim()); } catch (e) {}
+    boot();
+  });
+  const key = () => keyInput.value.trim();
+  const detSel = $('detector');
+  try { detSel.value = localStorage.getItem('seesaw_detector') || 'auto'; } catch (e) {}
+  detSel.onchange = () => { try { localStorage.setItem('seesaw_detector', detSel.value); } catch (e) {} if (currentBlob) analyze(currentBlob, currentName); };
+  const detectorChoice = () => detSel.value || 'auto';
+  const headers = () => (key() ? { 'X-API-Key': key() } : {});
+  const withKey = (url) => (key() ? url + (url.includes('?') ? '&' : '?') + 'api_key=' + encodeURIComponent(key()) : url);
+  async function api(path, options = {}) {
+    const r = await fetch(path, { ...options, headers: { ...(options.headers || {}), ...headers() } });
+    if (r.status === 401) throw new Error('API key required (top right)');
+    if (!r.ok) { let d = r.status; try { d = (await r.json()).detail; } catch (e) {} throw new Error(typeof d === 'string' ? d : JSON.stringify(d)); }
+    return r;
+  }
+
+  // ---- tabs ----
+  const pages = { image: $('page-image'), video: $('page-video'), live: $('page-live') };
+  function showTab(name) {
+    for (const [k, el] of Object.entries(pages)) el.classList.toggle('hidden', k !== name);
+    for (const k of Object.keys(pages)) $('tab-' + k).classList.toggle('active', k === name);
+    if (name === 'live') loadCameras();
+    if (name === 'video') { loadRuleSources(); loadSampleVideos(); }
+  }
+  for (const k of Object.keys(pages)) $('tab-' + k).onclick = () => showTab(k);
+
+  // ---- health ----
+  let detectorIsHog = true;
+  async function checkHealth() {
+    try {
+      const h = await (await fetch('/health')).json();
+      detectorIsHog = !String(h.object_detector).startsWith('yolo');
+      $('status').textContent = `online · ${h.object_detector} · auth ${h.auth}`;
+      $('det-hint').textContent = detectorIsHog ? 'right now only people are recognised (see the note on the right)' : 'recognises 80 object types';
+    } catch (e) { $('status').textContent = 'server not reachable'; }
+  }
+
+  // ---- feature chips ----
+  let catalog = [], selected = new Set();
+  const selectedList = () => catalog.filter((f) => selected.has(f.key)).map((f) => f.key);
+  const saveSel = () => { try { localStorage.setItem('seesaw_features', JSON.stringify([...selected])); } catch (e) {} };
+
+  async function loadFeatures() {
+    try { catalog = (await (await api('/features')).json()).features; } catch (e) { return; }
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('seesaw_features') || 'null'); } catch (e) {}
+    selected = new Set(catalog.filter((f) => f.status !== 'planned' && (Array.isArray(saved) ? saved.includes(f.key) : f.default_on)).map((f) => f.key));
+    renderFeatures();
+  }
+  function renderFeatures() {
+    const box = $('features'); box.innerHTML = '';
+    for (const f of catalog) {
+      const planned = f.status === 'planned';
+      const chip = document.createElement('span');
+      chip.className = 'chip' + (planned ? ' planned' : '') + (f.status === 'needs_model' ? ' model' : '') + (selected.has(f.key) ? ' on' : '');
+      chip.title = f.description + (planned ? ' (coming soon)' : f.status === 'needs_model' ? ' (needs: ' + f.needs.join(', ') + ')' : f.note ? ' (' + f.note + ')' : '') + (f.scope.includes('image') ? '' : ' · video and live only');
+      chip.innerHTML = `<span class="n">${f.number}</span>${esc(f.name)}` + (f.status === 'partial' && f.note ? ` <span class="n">· ${esc(f.note)}</span>` : '');
+      if (!planned) chip.onclick = () => { if (selected.has(f.key)) selected.delete(f.key); else selected.add(f.key); saveSel(); renderFeatures(); applyFeatures(); };
+      box.appendChild(chip);
+    }
+    $('feat-meta').textContent = `${selected.size} on`;
+  }
+  $('feat-all').onclick = (e) => { e.preventDefault(); selected = new Set(catalog.filter((f) => f.status !== 'planned').map((f) => f.key)); saveSel(); renderFeatures(); applyFeatures(); };
+  $('feat-none').onclick = (e) => { e.preventDefault(); selected = new Set(); saveSel(); renderFeatures(); applyFeatures(); };
+  async function applyFeatures() {
+    if (currentBlob && !pages.image.classList.contains('hidden')) analyze(currentBlob, currentName);
+    const id = $('cam-select').value;
+    if (id && !pages.live.classList.contains('hidden')) {
+      try { await api(`/cameras/${encodeURIComponent(id)}/features`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ features: selectedList() }) }); }
+      catch (e) { $('cam-status').textContent = 'features not applied: ' + e.message; }
+      pollLive();
+    }
+  }
+
+  // ---- image test ----
+  let img = null, dets = [], hot = -1, classHot = null, currentBlob = null, currentName = '';
+  const canvas = $('canvas'), ctx = canvas.getContext('2d'), tip = $('tip');
+  const colorFor = (name) => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 80% 60%)`; };
+  const minConf = () => parseFloat($('conf').value);
+  $('conf').oninput = () => { $('conf-val').textContent = minConf().toFixed(2); render(); updateNotice(); };
+  const visible = () => dets.map((d, i) => ({ d, i })).filter((x) => x.d.confidence >= minConf());
+  let lastResult = null;
+
+  function updateNotice() {
+    if (!lastResult) return;
+    const n = visible().length;
+    $('det-meta').textContent = `${n} object${n === 1 ? '' : 's'} · ${lastResult.time_ms} ms · ${lastResult.detector}`;
+    if (dets.length && !n) notice(`${dets.length} object${dets.length === 1 ? '' : 's'} found but hidden by the confidence slider. Move it left.`);
+    else if (!dets.length && detectorIsHog) notice('Nothing found. The current detector only knows people standing upright and fully visible, head to feet. For cars, animals, bags, phones, half-visible people and the rest, add the object model: run "py download_models.py" once and restart the server.');
+    else if (!dets.length) notice('Nothing found. The objects may be too small or too blurred.');
+    else notice('');
+  }
+
+  function render() {
+    if (!img) return;
+    ctx.drawImage(img, 0, 0);
+    const lw = Math.max(2, Math.round(canvas.width / 400));
+    const fontPx = Math.max(12, Math.round(canvas.width / 60));
+    ctx.font = `${fontPx}px system-ui, sans-serif`;
+    for (const { d, i } of visible()) {
+      const [x1, y1, x2, y2] = d.bbox; const color = colorFor(d.class_name);
+      const lit = i === hot || (classHot !== null && d.class_name === classHot);
+      if (lit) { ctx.fillStyle = color.replace('60%)', '60% / 0.25)'); ctx.fillRect(x1, y1, x2 - x1, y2 - y1); }
+      ctx.lineWidth = lit ? lw * 2 : lw; ctx.strokeStyle = color; ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      const label = `${d.class_name} ${pct(d.confidence)}`;
+      const tw = ctx.measureText(label).width + 8, th = fontPx + 6, ly = Math.max(0, y1 - th);
+      ctx.fillStyle = color; ctx.fillRect(x1, ly, tw, th);
+      ctx.fillStyle = '#000'; ctx.fillText(label, x1 + 4, ly + th - 5);
+    }
+    const list = $('det-list'); list.innerHTML = '';
+    const shown = visible();
+    for (const { d, i } of shown) {
+      const li = document.createElement('li'); li.className = i === hot ? 'hot' : '';
+      li.innerHTML = `<span><span class="swatch" style="background:${colorFor(d.class_name)}"></span>${esc(d.class_name)}</span><span class="muted">${pct(d.confidence)}</span>`;
+      li.onmouseenter = () => { hot = i; render(); }; li.onmouseleave = () => { hot = -1; render(); };
+      list.appendChild(li);
+    }
+    // class summary with counts, like an annotation tool's sidebar
+    const counts = {};
+    for (const { d } of shown) counts[d.class_name] = (counts[d.class_name] || 0) + 1;
+    const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+    const cl = $('class-list'); cl.innerHTML = '';
+    for (const name of names) {
+      const li = document.createElement('li');
+      li.innerHTML = `<span><span class="swatch" style="background:${colorFor(name)}"></span>${esc(name)}</span><span class="muted">${counts[name]}</span>`;
+      li.onmouseenter = () => { classHot = name; render(); }; li.onmouseleave = () => { classHot = null; render(); };
+      cl.appendChild(li);
+    }
+    $('classes-box').classList.toggle('hidden', !lastResult);
+    $('classes-total').textContent = shown.length ? `${shown.length} object${shown.length === 1 ? '' : 's'}, ${names.length} class${names.length === 1 ? '' : 'es'}` : 'nothing detected';
+  }
+  canvas.addEventListener('mousemove', (e) => {
+    if (!img) return;
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (canvas.width / r.width), y = (e.clientY - r.top) * (canvas.height / r.height);
+    let best = -1, bestArea = Infinity;
+    for (const { d, i } of visible()) { const [x1, y1, x2, y2] = d.bbox; if (x >= x1 && x <= x2 && y >= y1 && y <= y2) { const a = (x2 - x1) * (y2 - y1); if (a < bestArea) { best = i; bestArea = a; } } }
+    if (best !== hot) { hot = best; render(); }
+    if (best >= 0) { const d = dets[best]; tip.textContent = `${d.class_name} · ${pct(d.confidence)}`; tip.style.display = 'block'; tip.style.left = (e.clientX - r.left + 12) + 'px'; tip.style.top = (e.clientY - r.top + 12) + 'px'; }
+    else tip.style.display = 'none';
+  });
+  canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; if (hot !== -1) { hot = -1; render(); } });
+
+  function notice(text) { const n = $('img-notice'); n.classList.toggle('hidden', !text); n.textContent = text || ''; }
+
+  function showExpected(labels) {
+    const box = $('expected-box'), ul = $('expected-list'); ul.innerHTML = '';
+    const names = Object.keys(labels || {});
+    box.classList.toggle('hidden', !names.length);
+    for (const name of names) {
+      const li = document.createElement('li');
+      li.innerHTML = `<span><span class="swatch" style="background:${colorFor(name)}"></span>${esc(name)}</span><span class="muted">${labels[name]}</span>`;
+      ul.appendChild(li);
+    }
+  }
+
+  async function analyze(blob, name, labels) {
+    currentBlob = blob; currentName = name; notice('');
+    if (labels !== undefined) showExpected(labels);
+    img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(blob); });
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; dets = []; hot = -1; render();
+    const wanted = selectedList().filter((k) => (catalog.find((f) => f.key === k) || { scope: [] }).scope.includes('image'));
+    if (catalog.length && !wanted.length) { $('det-meta').textContent = 'switch on at least one feature above'; return; }
+    $('det-meta').textContent = 'detecting...';
+    const fd = new FormData(); fd.append('file', blob, name || 'image.jpg');
+    try {
+      const query = '?detector=' + detectorChoice() + (wanted.length ? '&features=' + encodeURIComponent(wanted.join(',')) : '');
+      const data = await (await api('/detect-image' + query, { method: 'POST', body: fd })).json();
+      dets = data.detections; lastResult = data; render(); updateNotice();
+    } catch (e) { $('det-meta').textContent = e.message; }
+  }
+  const drop = $('drop'), file = $('file');
+  drop.onclick = () => file.click();
+  file.onchange = () => { if (file.files[0]) analyze(file.files[0], file.files[0].name, {}); file.value = ''; };
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) analyze(f, f.name, {}); });
+  $('img-clear').onclick = () => { img = null; dets = []; lastResult = null; currentBlob = null; canvas.width = 16; canvas.height = 9; $('det-list').innerHTML = ''; $('class-list').innerHTML = ''; $('classes-box').classList.add('hidden'); showExpected({}); $('det-meta').textContent = 'no image yet'; notice(''); };
+
+  let sampleData = [], sampleFilter = 'all';
+  async function loadSamples() {
+    const strip = $('samples'); strip.innerHTML = '';
+    try {
+      const data = await (await api('/samples')).json();
+      sampleData = data.samples;
+      const cats = $('sample-cats'); cats.innerHTML = '';
+      for (const c of ['all', ...data.categories]) {
+        const a = document.createElement('a'); a.href = '#'; a.textContent = c; a.dataset.cat = c;
+        a.style.cssText = 'padding:2px 8px;border-radius:10px;border:1px solid var(--line);text-decoration:none;color:var(--text)';
+        a.onclick = (e) => { e.preventDefault(); sampleFilter = c; renderSamples(); };
+        cats.appendChild(a);
+      }
+      renderSamples();
+    } catch (e) { strip.innerHTML = `<span class="muted small">${esc(e.message)}</span>`; }
+  }
+  function renderSamples() {
+    const strip = $('samples'); strip.innerHTML = '';
+    for (const a of $('sample-cats').children) { const on = a.dataset.cat === sampleFilter; a.style.background = on ? 'var(--accent)' : 'none'; a.style.borderColor = on ? 'var(--accent)' : 'var(--line)'; }
+    const shown = sampleData.filter((s) => sampleFilter === 'all' || s.categories.includes(sampleFilter));
+    if (!shown.length) { strip.innerHTML = `<span class="muted small">no "${esc(sampleFilter)}" samples yet. Put photos in <code>samples/${esc(sampleFilter)}/</code> and refresh.</span>`; return; }
+    for (const s of shown) {
+      const im = document.createElement('img'); im.src = withKey(s.url); im.title = `${s.name} · ${s.categories.join(', ')}`; im.alt = s.name; im.loading = 'lazy';
+      im.onclick = async () => { const b = await (await fetch(withKey(s.url))).blob(); analyze(b, s.name.split('/').pop(), s.labels || {}); };
+      strip.appendChild(im);
+    }
+  }
+
+  // ---- video analysis ----
+  let job = null, vTimer = null;
+  async function loadRuleSources() {
+    try {
+      const { cameras } = await (await api('/cameras-config')).json();
+      const sel = $('v-rules'); const prev = sel.value; sel.innerHTML = '<option value="">none</option>';
+      for (const c of cameras) { const o = document.createElement('option'); o.value = c.camera_id; o.textContent = `${c.camera_id} (${c.zones.length} zone${c.zones.length === 1 ? '' : 's'})`; sel.appendChild(o); }
+      sel.value = prev;
+    } catch (e) {}
+  }
+  const vdrop = $('vdrop'), vfile = $('vfile');
+  vdrop.onclick = () => vfile.click();
+  vfile.onchange = () => { if (vfile.files[0]) uploadVideo(vfile.files[0]); vfile.value = ''; };
+  vdrop.addEventListener('dragover', (e) => { e.preventDefault(); vdrop.classList.add('over'); });
+  vdrop.addEventListener('dragleave', () => vdrop.classList.remove('over'));
+  vdrop.addEventListener('drop', (e) => { e.preventDefault(); vdrop.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) uploadVideo(f); });
+
+  let videoSamples = [], videoFilter = 'all';
+  async function loadSampleVideos() {
+    const strip = $('vsamples'); strip.innerHTML = '';
+    try {
+      const data = await (await api('/sample-videos')).json();
+      videoSamples = data.videos;
+      const cats = $('vsample-cats'); cats.innerHTML = '';
+      for (const c of ['all', ...data.categories]) {
+        const a = document.createElement('a'); a.href = '#'; a.textContent = c; a.dataset.cat = c;
+        a.style.cssText = 'padding:2px 8px;border-radius:10px;border:1px solid var(--line);text-decoration:none;color:var(--text)';
+        a.onclick = (e) => { e.preventDefault(); videoFilter = c; renderSampleVideos(); };
+        cats.appendChild(a);
+      }
+      renderSampleVideos();
+    } catch (e) { strip.innerHTML = `<span class="muted small">${esc(e.message)}</span>`; }
+  }
+  function renderSampleVideos() {
+    const strip = $('vsamples'); strip.innerHTML = '';
+    for (const a of $('vsample-cats').children) { const on = a.dataset.cat === videoFilter; a.style.background = on ? 'var(--accent)' : 'none'; a.style.borderColor = on ? 'var(--accent)' : 'var(--line)'; }
+    const shown = videoSamples.filter((v) => videoFilter === 'all' || v.categories.includes(videoFilter));
+    if (!shown.length) {
+      strip.innerHTML = videoFilter === 'all'
+        ? '<span class="muted small">no sample clips yet: run "py make_demo_videos.py" or put clips in samples/videos/</span>'
+        : `<span class="muted small">no "${esc(videoFilter)}" clips yet. Put videos in <code>samples/videos/${esc(videoFilter)}/</code> and refresh.</span>`;
+      return;
+    }
+    for (const v of shown) {
+      const im = document.createElement('img'); im.src = withKey(v.thumb); im.alt = v.name; im.loading = 'lazy';
+      im.title = `${v.name} · ${v.categories.join(', ')} · ${v.seconds == null ? '?' : v.seconds} s · ${v.size_mb} MB`;
+      im.onclick = () => startVideo(`/sample-videos/${v.name.split('/').map(encodeURIComponent).join('/')}/analyze`, null, v.name, v.size_mb);
+      strip.appendChild(im);
+    }
+  }
+  const uploadVideo = (f) => startVideo('/videos', f, f.name, (f.size / 1e6).toFixed(1));
+
+  async function startVideo(endpoint, file, name, sizeMb) {
+    if (job) await removeJob(false);
+    const wanted = selectedList();
+    if (catalog.length && !wanted.length) { $('v-status').textContent = 'switch on at least one feature above'; return; }
+    $('v-name').textContent = `${name}${sizeMb ? ' · ' + sizeMb + ' MB' : ''}`;
+    $('v-status').textContent = file ? 'uploading...' : 'starting...'; $('v-bar').style.width = '0';
+    const q = new URLSearchParams({ every_n: $('v-every').value, pace: $('v-pace').value, record: $('v-record').checked, features: wanted.join(','), width: 640, detector: detectorChoice() });
+    if ($('v-rules').value) q.set('rules_from', $('v-rules').value);
+    const options = { method: 'POST' };
+    if (file) { const fd = new FormData(); fd.append('file', file, file.name); options.body = fd; }
+    try { job = await (await api(endpoint + '?' + q.toString(), options)).json(); }
+    catch (e) { $('v-status').textContent = e.message; return; }
+    $('vstream').classList.remove('hidden'); $('vstream').src = withKey(`/cameras/${job.job_id}/stream?fps=15`);
+    $('v-stop').classList.remove('hidden'); $('v-remove').classList.remove('hidden'); $('v-download').classList.add('hidden');
+    clearInterval(vTimer); vTimer = setInterval(pollVideo, 1000); pollVideo();
+  }
+  async function pollVideo() {
+    if (!job) return;
+    try {
+      const s = await (await api(`/cameras/${job.job_id}`)).json();
+      const p = s.progress == null ? 0 : s.progress;
+      $('v-bar').style.width = pct(p);
+      $('v-status').textContent = `${s.people || 0} people now (max ${s.people_max || 0}) · ${s.state} · frame ${s.frames}${s.total_frames ? ' / ' + s.total_frames : ''} · ${s.fps} fps · detect ${s.detect_ms} ms · ${s.alerts} alerts` + (s.last_error ? ' · ' + s.last_error : '');
+      const a = await (await api(`/cameras/${job.job_id}/alerts?limit=30`)).json();
+      $('v-alerts').innerHTML = a.alerts.map((x) => `<div class="alert ${esc(x.severity)}"><strong>${esc(x.type)}</strong> <span class="muted small">at ${Number(x.timestamp).toFixed(1)} s</span><br>${esc(x.message)}</div>`).join('') || '<span class="muted">none yet</span>';
+      const sum = await (await api(`/cameras/${job.job_id}/summary`)).json();
+      const types = Object.entries(sum.alerts_by_type).map(([k, v]) => `${esc(k)}: ${v}`).join(', ') || 'none';
+      const seen = sum.seen_by_category || {};
+      const seenText = Object.entries(seen).map(([k, v]) => `${v} ${k}${v === 1 ? '' : 's'}`).join(', ') || 'none';
+      $('v-summary').innerHTML = `<b>most people at once</b><span class="stat">${sum.people_max || 0}</span><b>vehicles passed</b><span class="stat">${seen.vehicle || 0}</span><b>counted in total</b><span>${esc(seenText)}</span><b>alerts</b><span>${sum.alerts} (${types})</span><b>analysed</b><span>${sum.frames} frames${sum.duration_seconds != null ? ', ' + sum.duration_seconds + ' s' : ''}</span>`;
+      if (!s.alive) {
+        clearInterval(vTimer); vTimer = null; $('v-stop').classList.add('hidden');
+        if (s.record_path) { $('v-download').href = withKey(`/videos/${job.job_id}/download`); $('v-download').classList.remove('hidden'); }
+        if (s.state === 'finished') $('v-bar').style.width = '100%';
+      }
+    } catch (e) { $('v-status').textContent = e.message; clearInterval(vTimer); vTimer = null; }
+  }
+  $('v-stop').onclick = async () => { if (job) { try { await api(`/cameras/${job.job_id}`, { method: 'DELETE' }); } catch (e) {} } };
+  async function removeJob(resetUi = true) {
+    clearInterval(vTimer); vTimer = null;
+    if (job) { try { await api(`/cameras/${job.job_id}`, { method: 'DELETE' }); } catch (e) {} job = null; }
+    if (resetUi) { $('vstream').classList.add('hidden'); $('vstream').removeAttribute('src'); $('v-bar').style.width = '0'; $('v-status').textContent = ''; $('v-name').textContent = ''; $('v-alerts').innerHTML = '<span class="muted">none yet</span>'; $('v-summary').innerHTML = '<span class="muted">upload a video to see people seen, alerts by type and duration.</span>'; for (const id of ['v-stop', 'v-download', 'v-remove']) $(id).classList.add('hidden'); }
+  }
+  $('v-remove').onclick = () => removeJob(true);
+
+  // ---- live cameras ----
+  let camTimer = null;
+  async function loadCameras() {
+    let cameras;
+    try { cameras = (await (await api('/cameras')).json()).cameras.filter((c) => c.kind === 'camera'); }
+    catch (e) { $('cam-status').textContent = e.message; return; }
+    const sel = $('cam-select'); const prev = sel.value; sel.innerHTML = '';
+    for (const c of cameras) { const o = document.createElement('option'); o.value = c.camera_id; o.textContent = `${c.camera_id} (${c.state})`; sel.appendChild(o); }
+    if (!cameras.length) { $('cam-status').textContent = 'no camera running. Type a source on the right and press start.'; $('stream').removeAttribute('src'); clearInterval(camTimer); return; }
+    sel.value = cameras.some((c) => c.camera_id === prev) ? prev : cameras[0].camera_id;
+    selectCamera();
+  }
+  async function selectCamera() {
+    const id = $('cam-select').value; if (!id) return;
+    $('stream').src = withKey(`/cameras/${encodeURIComponent(id)}/stream`);
+    clearInterval(camTimer); camTimer = setInterval(pollLive, 2000); pollLive();
+    try { const s = await (await api(`/cameras/${encodeURIComponent(id)}`)).json(); if (Array.isArray(s.features)) { selected = new Set(s.features); renderFeatures(); } } catch (e) {}
+  }
+  async function pollLive() {
+    const id = $('cam-select').value;
+    if (!id || pages.live.classList.contains('hidden')) return;
+    try {
+      const s = await (await api(`/cameras/${encodeURIComponent(id)}`)).json();
+      const counts = s.counts || {}, seen = s.seen || {};
+      const vehiclesNow = counts.vehicle || 0, vehiclesTotal = seen.vehicle || 0;
+      const others = Object.entries(s.objects || {}).map(([k, v]) => `${v} ${k}`).join(', ');
+      $('cam-status').innerHTML =
+        `<span class="stat">${s.people || 0}</span> people now (max ${s.people_max || 0}, total ${seen.person || 0}) · ` +
+        `<span class="stat">${vehiclesNow}</span> vehicles now (total passed ${vehiclesTotal})` +
+        (others ? ` · ${esc(others)}` : '') +
+        `<br><span class="muted">${esc(s.state)} · ${s.fps} fps · detect ${s.detect_ms} ms · ${s.alerts} alerts${s.last_error ? ' · ' + esc(s.last_error) : ''}</span>`;
+      const a = await (await api('/alerts?limit=20&camera_id=' + encodeURIComponent(id))).json();
+      $('alerts').innerHTML = a.alerts.map((x) => `<div class="alert ${esc(x.severity)}"><strong>${esc(x.type)}</strong> <span class="muted small">${esc(x.time)}</span><br>${esc(x.message)}</div>`).join('') || '<span class="muted">no alerts yet</span>';
+    } catch (e) {}
+  }
+  $('cam-select').onchange = selectCamera;
+  $('cam-refresh').onclick = loadCameras;
+  $('cam-start').onclick = async () => {
+    const body = { camera_id: $('new-id').value.trim() || 'cam1', source: $('new-src').value.trim(), every_n: 2, width: 640, features: selectedList(), detector: detectorChoice() };
+    if (!body.source) { $('cam-status').textContent = 'enter a source first'; return; }
+    try { await api('/cameras', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); $('cam-status').textContent = 'started'; }
+    catch (e) { $('cam-status').textContent = 'failed: ' + e.message; }
+    loadCameras();
+  };
+
+  function boot() { checkHealth(); loadFeatures(); loadSamples(); }
+  boot();
+})();
+</script>
+</body>
+</html>
